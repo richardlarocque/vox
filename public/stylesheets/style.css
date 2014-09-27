@@ -1,8 +1,170 @@
 body {
-  padding: 50px;
-  font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
+    background-color: #002;
+    font-family: sans-serif; 
 }
 
-a {
-  color: #00B7FF;
+#container {
+    background-color: white;
+
+    margin-left: auto;
+    margin-right: auto;
+
+    min-width: 275px;
+    max-width: 600px;
+
+    min-height: 300px;
+    height: 100vh;
+    max-height: 500px;
+
+    display: flex;
+    flex-direction: column;
+}
+
+#header {
+    background-color: #ddf;
+    width: 100%;
+    max-height: 48px;
+    display: flex;
+}
+
+#main {
+    display: flex;
+    flex-direction: row;
+    flex: 1;
+    flex-wrap: wrap;
+}
+
+#peer-container {
+    border: 1px solid #ddd;
+    margin: 4px;
+    flex: 1;
+    min-width: 275px;
+    min-height: 150px;
+    display: flex;
+}
+
+#chat-container {
+    border: 1px solid #ddd;
+    margin: 4px;
+    flex-direction: column;
+    flex: 1;
+    display: flex;
+    min-width: 275px;
+    min-height: 150px;
+}
+
+#self-container {
+    clear: both;
+}
+
+#audio-output {
+    display: none;
+}
+
+/* Inside header */
+
+h1#title {
+    font-size: x-large;
+    font-family: sans-serif;
+    margin: 10pt;
+}
+
+#header-left {
+    height: 48px;
+}
+
+#header-right {
+    height: 48px;
+    flex: 1;
+    display: flex;
+    justify-content: flex-end;
+}
+
+#name-controller {
+    display: flex;
+    justify-content: flex-end;
+}
+
+#name-controller .user-div input {
+    width: 150px;
+    font-size: larger;
+    margin: 10px;
+    background-color: #eef;
+    border-style: none;
+}
+
+#name-controller .user-img {
+    max-height: 100%;
+}
+
+/* Inside peer-container */
+
+ul.users {
+    overflow-y: scroll;
+    flex: 1;
+}
+
+li.user {
+    max-height: 64px;
+    padding: 1px;
+    border: 1px solid #ddd;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+li.user .user-img {
+    display: inline-block;
+    max-height: 100%;
+}
+
+li.user-ready-false .user-img {
+    opacity: 0.7;
+}
+
+li.user-ready-false .name {
+    opacity: 0.7;
+}
+
+li.user .user-text {
+    display: inline-block;
+    vertical-align: top;
+    padding: 5px
+}
+
+li.user span.name {
+    display: block;
+    font-size: large;
+}
+
+ul.debug {
+    font-size: small;
+    color: #888;
+}
+
+/* Chat container */
+
+ul#chat-window {
+    flex: 1;
+}
+
+.msg .date {
+    color: #666;
+}
+
+.msg .username {
+    font-weight: bold;
+}
+
+.msg .message {
+    display: inline;
+}
+
+#chat-send {
+    display: flex;
+    flex: none;
+}
+
+#chat-send .input-box {
+    flex: 1;
+    border: 1px solid #ddd;
 }
