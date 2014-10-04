@@ -7,121 +7,82 @@ var _ = require('underscore');
 
 var namer = moniker.generator([moniker.adjective, moniker.noun], { glue: ' ' });
 
-var userState = [];
+var roomState = {};
 
-var updateOthers = function(userId) {
-  var ids = _.keys(userState);
-  var other_ids = _.without(ids, userId);
-  _.each(_.pick(userState, other_ids), sendStateUpdate);
-}
-
-var lookupSocket = function(id) {
-    return server.sockets.connected[id];
-}
-
-// Generic forwarder function.
-router.on('*', function(sock, args, next) {
-    var name = args[0];
-    var msg = args[1];
-    if (msg && msg.targetId) {
-	var s = server.sockets.connected[msg.targetId];
-	if (s) {
-	    console.log('Relaying: ' + JSON.stringify(msg));
-	    s.emit(name, msg);
-	} else {
-	    console.error("Message addressed to unknown client." + JSON.stringify(msg));
-	}
-    }
-    next();
-});
-
-router.on('mic-ready', function(sock, args, next) {
-    console.log('Got mic ready');
-    userState[sock.id].ready = true;
-    updateOthers(sock.id);
-    next();
-});
-
-router.on('update-user-state', function(sock, args, next) {
-    console.log(JSON.stringify(args));
-    var opts = args[1];
-
-    var name;
-    var user = userState[sock.id];
-    try {
-	name = sanitizer.sanitize(opts.name).substring(0,255);
-    } catch(err) {
-	console.log('Error: ' + err);
-    }
-
-    if (name) {
-	user.name = name;
-	console.log('Setting name: ' + name);
-    }
-    updateOthers(user.id);
-    next();
-});
-
-
-server.use(router);
-
-var sendStateUpdate = function(user) {
-  var socket = lookupSocket(user.id);
-  if (!socket) {
-    console.log('Lookup failed, skipping: ' + user.name);
-    return;
-  }
-  var others = _.omit(userState, user.id);
-  var peerData = _.map(others, function(x) { return _.pick(x, 'name', 'id', 'ready') } );
-  console.log('Updating: ' + user.name);
-  console.log('others: ', _.keys(peerData).length);
-  _.each(peerData, function(u) {
-    console.log(JSON.stringify(u));
-  });
-  socket.emit('state-update', { clientId: user.id, clientName: user.name, peers: peerData });
-}
-
-var broadcastMessage = function(msg) {
-  _.each(_.values(userState), function(user) {
-    var socket = lookupSocket(user.id);
-    if (!socket) {
-      console.log('Lookup failed, skipping: ' + user.name);
-      return;
-    }
-    socket.emit('message-sent', msg);
-  });
+var relay = function(socket, name) {
+    socket.on(name, function(msg) {
+        if (!msg || !msg.targetId) {
+            return;
+        }
+        var s = server.sockets.connected[msg.targetId];
+        if (!s) {
+            console.error("Message addressed to unknown client.");
+        } else {
+            s.emit(name, msg);
+        }
+    });
 };
 
 server.on('connect', function(socket) {
-    console.log('Connected!');
-
     var id = socket.id;
-    var newUser = {
-	id: socket.id,
-	name: capitalize.words(namer.choose()),
+    var room = '';
+    var initialName = capitalize.words(namer.choose());
+    var userState = { id: socket.id, name: initialName };
+
+    socket.emit('name-offered', initialName);
+
+    var broadcast = function(name, data) {
+        if (!room) { return; }
+        server.to(room).emit(name, data);
     };
 
-    userState[id] = newUser;
+    var broadcastState = function() {
+        broadcast('state-update', roomState[room]);
+    };
 
-    socket.emit('name-offered', { name: newUser.name });
+    var updateState = function() {
+        if (!room) { return; }
+        if (!roomState[room]) { roomState[room] = {}; }
+        roomState[room][id] = userState;
+        broadcastState();
+    };
 
-    sendStateUpdate(newUser);
-    updateOthers(newUser.id);
+    socket.on('join-room', function(roomName) {
+        room = roomName;
+        socket.join(room);
 
-    console.log(JSON.stringify(newUser));
+        socket.emit('id-assigned', socket.id);
 
-    socket.on('send-message', function(text) {
-	var data = {
-	    username: userState[socket.id].name,
-	    time: (new Date()).getTime(),
-	    text: text
-	}
-	broadcastMessage(data);
+        updateState();
     });
 
+    socket.on('mic-ready', function() {
+        userState.ready = true;
+        updateState();
+    });
+
+    socket.on('set-name', function(name) {
+        userState.name = name;
+        updateState();
+    });
+
+    socket.on('send-message', function(text) {
+        broadcast('message-sent', {
+            username: userState.name,
+            time: (new Date()).getTime(),
+            text: text
+        });
+    });
+
+    relay(socket, 'ice-candidate-offer');
+    relay(socket, 'call-initiation');
+    relay(socket, 'call-acceptance');
+
     socket.on('disconnect', function() {
-	delete userState[socket.id];
-	updateOthers(socket.id);
+        if (room) {
+            delete roomState[room][id];
+        }
+        broadcastState();
     });
 });
 

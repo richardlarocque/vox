@@ -67,10 +67,14 @@ h1#title {
     font-size: x-large;
     font-family: sans-serif;
     margin: 10pt;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
 }
 
 #header-left {
     height: 48px;
+    flex: 1;
 }
 
 #header-right {
@@ -86,7 +90,8 @@ h1#title {
 }
 
 #name-controller .user-div input {
-    width: 150px;
+    min-width: 150px;
+    max-width: 250px;
     font-size: larger;
     margin: 10px;
     background-color: #eef;
@@ -94,7 +99,12 @@ h1#title {
 }
 
 #name-controller .user-img {
-    max-height: 100%;
+    height: 48px;
+    width: 48px;
+}
+
+#name-controller .input-ready-false {
+    opacity: 0.5;
 }
 
 /* Inside peer-container */

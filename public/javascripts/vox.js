@@ -1,3 +1,5 @@
+'use strict';
+
 // Polyfills.
 var RTCPeerConnection = window.RTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection;
 var RTCSessionDescription = window.RTCSessionDescription || window.mozRTCSessionDescription || window.webkitRTCSessionDescription;
@@ -18,12 +20,12 @@ function Peer(initialState, sockService, mediaService, manager) {
     self.on = function(eventName, callback) {
         self.listeners[eventName] = self.listeners[eventName] || [];
         self.listeners[eventName].push(callback);
-    }
+    };
 
     self.emit = function(eventName, params) {
         _.each(self.listeners[eventName], function(cb) { cb(params); });
-        _.each(self.eventProxies, function(ep) { ep.emit(eventName, params); })
-    }
+        _.each(self.eventProxies, function(ep) { ep.emit(eventName, params); });
+    };
     
     self.updateState = function(params) {
         var readyStateChanging = self.peer.ready != params.ready;
@@ -36,11 +38,11 @@ function Peer(initialState, sockService, mediaService, manager) {
         if (readyStateChanging) {
             self.emit('ready-state-changed');
         }
-    }
+    };
 
     self.isReady = function() {
         return self.peer.ready && pc.iceConnectionState != 'closed';
-    }
+    };
 
     var relayIceCandidate = function(event) {
         if (!event.candidate) {
@@ -53,8 +55,8 @@ function Peer(initialState, sockService, mediaService, manager) {
             targetId: self.peer.id,
             senderId: self.local.id,
             candidate: event.candidate
-        })
-    }
+        });
+    };
 
     var receiveIceCandidate = function(msg) {
         if (self.destructed) { return; }
@@ -62,7 +64,7 @@ function Peer(initialState, sockService, mediaService, manager) {
         
         console.log('Received ice candidate');
         self.pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
-    }
+    };
 
     var startCall = function() {
         if (self.destructed) { return; }
@@ -72,7 +74,7 @@ function Peer(initialState, sockService, mediaService, manager) {
         }
         self.didInitiateCall = true;
         
-        console.log('Calling to ' + self.peer.id)
+        console.log('Calling to ' + self.peer.id);
 
         self.pc.addStream(mediaService.stream);
         self.pc.createOffer(function(offer) {
@@ -84,7 +86,7 @@ function Peer(initialState, sockService, mediaService, manager) {
                 });
             }, error);
         }, error);
-    }
+    };
 
     var acceptCall = function(msg) {
         if (self.destructed) { return; }
@@ -101,10 +103,10 @@ function Peer(initialState, sockService, mediaService, manager) {
                         answer: answer
                         
                     });
-                })
-            }, error)
-        })
-    }
+                });
+            }, error);
+        });
+    };
 
     var callAccepted = function(msg) {
         if (self.destructed) { return; }
@@ -118,7 +120,7 @@ function Peer(initialState, sockService, mediaService, manager) {
         console.log('Destructing ' + self.local.id);
         self.destructed = true;  // HAX!  FIXME
         self.pc.close();
-    }
+    };
 
     var tryConnect = function() {
         if (!mediaService.haveMedia()) {
@@ -131,11 +133,11 @@ function Peer(initialState, sockService, mediaService, manager) {
             return;
         }
         startCall();
-    }
+    };
 
     self.local = {};
     
-    self.local.id = manager.id;
+    self.local.id = sockService.id;
     self.eventProxies = [manager];
 
     self.listeners = {};
@@ -145,13 +147,13 @@ function Peer(initialState, sockService, mediaService, manager) {
 
     mediaService.on('got-user-media', function() { tryConnect(); });
 
-    self.on('ready-state-changed', function() { tryConnect() });
+    self.on('ready-state-changed', function() { tryConnect(); });
 
     self.pc.onicecandidate = relayIceCandidate;
-    self.pc.onaddstream = function(event) { self.emit('stream-added', event) }
-    self.pc.oniceconnectionstatechange = function(event) { self.emit('iceconnectionstatechange', event); }
-    self.pc.onsignalingstatechange = function(event) { self.emit('signalingstatechange', event); }
-    self.pc.onnegotiationneeded = function(event) { self.emit('negotiationneeded', event); }
+    self.pc.onaddstream = function(event) { self.emit('stream-added', event); };
+    self.pc.oniceconnectionstatechange = function(event) { self.emit('iceconnectionstatechange', event); };
+    self.pc.onsignalingstatechange = function(event) { self.emit('signalingstatechange', event); };
+    self.pc.onnegotiationneeded = function(event) { self.emit('negotiationneeded', event); };
 
     sockService.on('call-initiation', acceptCall);
     sockService.on('call-acceptance', callAccepted);
@@ -166,11 +168,16 @@ angular.module('voxApp', ['ngSanitize'])
     .filter('base64', function() {
         return function(input) {
             return btoa(input);
-        }
+        };
     })
 
     .factory('sockService', function() {
-        return io();
+        var socket = io();
+        socket.emit('join-room', document.location.pathname);
+        socket.on('id-assigned', function(id) {
+            socket.id = id;
+        });
+        return socket;
     })
 
     .factory('mediaService', ['sockService', function(sockService) {
@@ -180,20 +187,20 @@ angular.module('voxApp', ['ngSanitize'])
         ret.on = function(eventName, callback) {
             listeners[eventName] = listeners[eventName] || [];
             listeners[eventName].push(callback);
-        }
+        };
         
         ret.emit = function(eventName, params) {
             _.each(listeners[eventName], function(cb) { cb(params); });
-        }
+        };
 
         ret.haveMedia = function() {
             return ret.stream && !ret.stream.ended;
-        }
+        };
 
         getUserMedia.bind(navigator)({ audio: true, video: false }, function(stream) {
             stream.onended = function() {
                 ret.emit('stream-ended');
-            }
+            };
             
             sockService.emit('mic-ready');
             ret.stream = stream;
@@ -208,64 +215,70 @@ angular.module('voxApp', ['ngSanitize'])
         var listeners = [];
 
         var ret = {};
-        ret.id = '';
 
         ret.on = function(eventName, callback) {
             listeners[eventName] = listeners[eventName] || [];
             listeners[eventName].push(callback);
-        }
+        };
     
         ret.emit = function(eventName, params) {
             _.each(listeners[eventName], function(cb) { cb(params); });
-        }
+        };
 
         ret.getPeers = function() {
             return peers;
-        }
+        };
 
-        sockService.on('state-update', function(update) {
-            if (!ret.id) {
-                ret.id = update.clientId;
+        sockService.on('state-update', function(users) {
+            if (!sockService.id) {
+                return;
             }
 
-            var peerUpdateMap = _.indexBy(update.peers, 'id');
-            
+            // Don't count ourselves here.
+            var users = _.omit(users, sockService.id);
+
             // Remove old peers.
-            var missing = _.difference(_.keys(peers), _.keys(peerUpdateMap));
+            var missing = _.difference(_.keys(peers), _.keys(users));
             _.each(missing, function(peerId) {
                 peers[peerId].destruct();
                 delete peers[peerId];
             });
 
-            var newPeers = _.difference(_.keys(peerUpdateMap), _.keys(peers));
+            var newPeers = _.difference(_.keys(users), _.keys(peers));
             _.each(newPeers, function(peerId) {
-                peers[peerId] = Peer(peerUpdateMap[peerId], sockService, mediaService, ret);
-            })
+                peers[peerId] = Peer(users[peerId], sockService, mediaService, ret);
+            });
 
-            var updated = _.intersection(_.keys(peerUpdateMap), _.keys(peers));
+            var updated = _.intersection(_.keys(users), _.keys(peers));
             _.each(updated, function(peerId) {
-                peers[peerId].updateState(peerUpdateMap[peerId]);
+                peers[peerId].updateState(users[peerId]);
             });
         });
 
         return ret;
     }])
 
-    .controller('NameController', ['$scope', 'sockService', function($scope, sockService) {
+    .controller('NameController', ['$scope', 'sockService', 'mediaService', function($scope, sockService, mediaService) {
         $scope.name = '';
 
-        sockService.on('name-offered', function(msg) {
+        $scope.haveMedia = function() {
+            return !!mediaService.haveMedia();
+        };
+
+        sockService.on('name-offered', function(name) {
             if (!$scope.name) {
-                $scope.name = msg.name;
-                console.log('Received name: ' + msg.name);
+                $scope.name = name;
                 $scope.$apply();
             }
-        })
+        });
+
+        mediaService.on('got-user-media', function() {
+            $scope.$apply();
+        });
 
         $scope.$watch(function() { return $scope.name }, function (value) {
             if (value) {
-              sockService.emit('update-user-state', { name: value });
-              console.log('Emitting name: ' + value);
+              sockService.emit('set-name', value);
             }
         });
     }])
@@ -273,7 +286,7 @@ angular.module('voxApp', ['ngSanitize'])
     .controller('OthersController', ['$scope', 'peerService', function($scope, peerService) {
         $scope.peers = function() {
             return peerService.getPeers();
-        }
+        };
 
         var listenFor = function(source, eventName) {
             source.on(eventName, function(event) {
@@ -312,4 +325,4 @@ angular.module('voxApp', ['ngSanitize'])
             $scope.blobURLs.push($sce.trustAsResourceUrl(URL.createObjectURL(event.stream)));
             $scope.$apply();
         });
-    }])
+    }]);
