@@ -19,6 +19,5 @@ Visitors who visit / will be redirected to a randomly generated room.
 Built with Node, Express, Angular, socket.io, and WebRTC.
 
 ===
-
 Licensed under the Apache License, Version 2.0.  See LICENSE file for
 details.
