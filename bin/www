@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-var debug = require('debug')('vox4');
+var debug = require('debug')('vox');
 var http = require('http');
 var ws = require('../ws');
 var app = require('../app');
